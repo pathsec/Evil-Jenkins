@@ -1,3 +1,12 @@
+<p align="center">
+  <img
+    width="512"
+    height="512"
+    alt="evil-jenkins-logo-simple"
+    src="https://github.com/user-attachments/assets/8ce5a6f3-0d03-41b9-b78d-a4b74d12f64d"
+  />
+</p>
+
 # Evil Jenkins
 
 A command-and-control (C2) POC framework that uses the Jenkins Remoting protocol as its transport layer. By emulating a legitimate Jenkins controller, Evil Jenkins allows operators to manage implants that appear to network defenders and traffic analysis as ordinary Jenkins build agents performing CI/CD work.
