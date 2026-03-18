@@ -9,7 +9,7 @@
 
 # Evil Jenkins
 
-A command-and-control (C2) POC framework that uses the Jenkins Remoting protocol as its transport layer. By emulating a legitimate Jenkins controller, Evil Jenkins allows operators to manage implants that appear to network defenders and traffic analysis as ordinary Jenkins build agents performing CI/CD work.
+A command-and-control (C2) POC framework that uses the Jenkins Remoting protocol as its transport layer. By emulating a legitimate Jenkins controller, Evil Jenkins allows operators to manage implants that appear to network defenders and traffic analysis on first inspection as ordinary Jenkins build agents.
 
 Unmodified `jenkins/inbound-agent` Docker containers and native `agent.jar` instances on Linux, macOS, and Windows connect over **JNLP4-connect**, the same TLS-wrapped protocol used by production Jenkins infrastructure worldwide.
 
