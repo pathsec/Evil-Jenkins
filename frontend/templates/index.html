@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evil Jenkins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0: #060b14;
+  --bg1: #0c1220;
+  --bg2: #111a2e;
+  --bg3: #162038;
+  --bg4: #1c2840;
+  --border: #1e2f4a;
+  --border-bright: #2a4166;
+  --text0: #e8eef8;
+  --text1: #9eb3d0;
+  --text2: #5a7a9e;
+  --cyan: #00c8e8;
+  --cyan-dim: #0090a8;
+  --green: #00e676;
+  --green-dim: #00994d;
+  --red: #ff4f6e;
+  --red-dim: #8c1a28;
+  --yellow: #ffc94d;
+  --purple: #a78bfa;
+  --term-bg: #02060f;
+  --term-prompt: #00e676;
+  --term-cmd: #c8daf5;
+  --term-out: #8bacc8;
+  --term-err: #ff4f6e;
+  --term-info: #00c8e8;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow: 0 4px 24px rgba(0,0,0,.45);
+  --transition: 180ms ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg0);
+  color: var(--text0);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 20px;
+  height: 52px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.header-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 600; color: var(--text0);
+  letter-spacing: -.2px;
+}
+.header-logo svg { color: var(--cyan); }
+.header-sep { flex: 1; }
+.controller-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px; color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+}
+.controller-badge .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text2);
+  transition: background var(--transition);
+}
+.controller-badge.ok .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.controller-badge.err .dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+.body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-header {
+  display: flex; align-items: center;
+  padding: 14px 16px 10px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text2);
+}
+.sidebar-header span { flex: 1; }
+.btn-icon {
+  background: none; border: none; cursor: pointer;
+  color: var(--text2); padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  transition: color var(--transition), background var(--transition);
+}
+.btn-icon:hover { color: var(--cyan); background: var(--bg3); }
+
+.agents-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+
+.agent-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background var(--transition);
+  margin-bottom: 2px;
+  position: relative;
+}
+.agent-item:hover { background: var(--bg3); }
+.agent-item.active { background: var(--bg4); }
+.agent-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 2px; background: var(--cyan); border-radius: 0 2px 2px 0;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text2);
+}
+.status-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-dim);
+  animation: pulse 2.5s infinite;
+}
+.status-dot.disconnected { background: var(--text2); }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--green-dim); }
+  50% { box-shadow: 0 0 14px var(--green), 0 0 4px var(--green); }
+}
+
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-weight: 500; font-size: 13px; truncate; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-meta { font-size: 11px; color: var(--text2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.agent-actions {
+  display: none;
+  gap: 2px;
+}
+.agent-item:hover .agent-actions,
+.agent-item.active .agent-actions { display: flex; }
+
+.sidebar-footer {
+  padding: 10px 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Main ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.tabs {
+  display: flex; align-items: center;
+  padding: 0 20px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 2px;
+}
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 14px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text2);
+  font-size: 13px; font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition);
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text1); }
+.tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.tab svg { opacity: .7; }
+.tab.active svg { opacity: 1; }
+.tab-sep { flex: 1; }
+
+.panel { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+.panel.active { display: flex; }
+
+/* ── Shell Panel ── */
+.shell-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shell-toolbar label { font-size: 12px; color: var(--text2); }
+.select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text0);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.select:focus { border-color: var(--cyan-dim); }
+.mode-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.mode-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 5px 12px;
+  font-size: 12px; font-weight: 500;
+  color: var(--text2);
+  transition: all var(--transition);
+}
+.mode-btn.active { background: var(--bg4); color: var(--cyan); }
+.spacer { flex: 1; }
+
+.shell-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--term-bg);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.shell-welcome {
+  color: var(--text2);
+  padding: 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.shell-welcome .ascii {
+  color: var(--cyan-dim);
+  font-size: 11px;
+  line-height: 1.3;
+  margin-bottom: 8px;
+  white-space: pre;
+}
+
+.exec-block { margin-bottom: 16px; }
+.exec-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.exec-agent-tag {
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg3);
+  color: var(--cyan);
+  border: 1px solid var(--cyan-dim);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.exec-time { font-size: 11px; color: var(--text2); }
+.exec-duration { font-size: 11px; color: var(--text2); margin-left: auto; }
+
+.exec-cmd {
+  color: var(--term-prompt);
+  display: flex; gap: 8px;
+  margin-bottom: 2px;
+}
+.exec-cmd .prompt { color: var(--term-prompt); user-select: none; }
+.exec-cmd .cmd-text { color: var(--term-cmd); white-space: pre-wrap; word-break: break-all; }
+.exec-cmd.multiline .cmd-text {
+  display: block;
+  padding: 6px 10px;
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid var(--term-prompt);
+  margin-left: 16px;
+}
+.exec-output { color: var(--term-out); white-space: pre-wrap; word-break: break-word; }
+.exec-output.error { color: var(--term-err); }
+.exec-output.running {
+  color: var(--term-info);
+  display: flex; align-items: center; gap: 8px;
+}
+
+.spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--bg4);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.exec-output.compile-err { color: var(--yellow); }
+
+/* shell input area */
+.shell-input-area {
+  border-top: 1px solid var(--border);
+  background: var(--bg1);
+  flex-shrink: 0;
+}
+.shell-input-shell {
+  display: flex; align-items: center; gap: 0;
+  padding: 10px 16px;
+}
+.shell-prompt-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 500;
+  color: var(--term-prompt);
+  padding: 6px 10px 6px 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+.shell-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--term-cmd);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  caret-color: var(--cyan);
+  line-height: 1.6;
+}
+.shell-run-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px; font-weight: 500;
+  font-family: inherit;
+  transition: all var(--transition);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.shell-run-btn:hover { border-color: var(--cyan-dim); color: var(--cyan); }
+.shell-run-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.shell-input-script { padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.script-textarea {
+  width: 100%;
+  min-height: 90px;
+  max-height: 200px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--term-cmd);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  transition: border-color var(--transition);
+}
+.script-textarea:focus { border-color: var(--cyan-dim); }
+.script-footer { display: flex; align-items: center; gap: 8px; }
+.script-hint { font-size: 11px; color: var(--text2); flex: 1; }
+
+/* ── Agents Panel ── */
+.agents-panel-inner { padding: 20px; overflow-y: auto; flex: 1; }
+
+.panel-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px;
+}
+.panel-title { font-size: 16px; font-weight: 600; }
+.panel-subtitle { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.agent-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.agent-card:hover { border-color: var(--border-bright); box-shadow: var(--shadow); }
+.agent-card-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.agent-card-name { font-size: 15px; font-weight: 600; flex: 1; }
+.status-badge {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.status-badge.connected { background: rgba(0,230,118,.12); color: var(--green); border: 1px solid rgba(0,230,118,.25); }
+.status-badge.disconnected { background: rgba(90,122,158,.12); color: var(--text2); border: 1px solid var(--border); }
+
+.agent-card-labels { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+.label-chip {
+  font-size: 11px; padding: 2px 8px;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text1);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.agent-card-meta { font-size: 12px; color: var(--text2); margin-bottom: 14px; line-height: 1.8; }
+.agent-card-meta span { color: var(--text1); }
+
+.agent-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500;
+  font-family: inherit;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--cyan-dim); border-color: var(--cyan); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--cyan); }
+.btn-ghost { background: none; border-color: var(--border); color: var(--text1); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text0); background: var(--bg3); }
+.btn-danger { background: none; border-color: rgba(255,79,110,.3); color: var(--red); }
+.btn-danger:hover:not(:disabled) { background: rgba(255,79,110,.1); border-color: var(--red); }
+.btn-success { background: rgba(0,230,118,.12); border-color: rgba(0,230,118,.25); color: var(--green); }
+.btn-success:hover:not(:disabled) { background: rgba(0,230,118,.2); }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* ── Downloads Panel ── */
+.downloads-panel-inner { padding: 20px; overflow-y: auto; flex: 1; }
+.download-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  max-width: 640px;
+}
+.download-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.download-card p { font-size: 13px; color: var(--text1); margin-bottom: 14px; line-height: 1.6; }
+.code-block {
+  background: var(--term-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--term-out);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 12px;
+  position: relative;
+}
+.copy-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); padding: 3px 8px;
+  border-radius: 4px; font-size: 11px;
+  cursor: pointer; transition: all var(--transition);
+}
+.copy-btn:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--transition);
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  padding: 24px;
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  transform: translateY(-8px);
+  transition: transform var(--transition);
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.modal-title { font-size: 16px; font-weight: 600; flex: 1; }
+.modal-body { display: flex; flex-direction: column; gap: 14px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--text1); }
+.form-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text0);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.form-input:focus { border-color: var(--cyan-dim); }
+.form-hint { font-size: 11px; color: var(--text2); }
+
+/* ── Secret Result ── */
+.secret-box {
+  background: var(--bg3);
+  border: 1px solid var(--green-dim);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-top: 4px;
+}
+.secret-box .secret-label { font-size: 11px; color: var(--green); font-weight: 600; margin-bottom: 6px; letter-spacing: .05em; text-transform: uppercase; }
+.secret-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--term-cmd);
+  word-break: break-all;
+  background: var(--term-bg);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  cursor: text; user-select: all;
+}
+.launch-cmd-box {
+  background: var(--term-bg);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--term-out);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+
+/* ── Tooltip ── */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg4); border: 1px solid var(--border-bright);
+  color: var(--text0); font-size: 11px; padding: 4px 8px;
+  border-radius: 4px; white-space: nowrap;
+  pointer-events: none; opacity: 0;
+  transition: opacity var(--transition);
+  z-index: 200;
+}
+[data-tip]:hover::after { opacity: 1; }
+/* Sidebar header tooltips point downward to avoid being clipped by overflow:hidden + the top banner */
+.sidebar-header [data-tip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+/* ── Empty states ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px 24px;
+  color: var(--text2);
+  text-align: center;
+  gap: 10px;
+}
+.empty-state svg { opacity: .3; }
+.empty-state p { font-size: 13px; max-width: 240px; }
+
+/* ── Responsive ── */
+@media (max-width: 680px) {
+  .sidebar { width: 220px; }
+  .agents-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ─── Header ─── -->
+  <header class="header">
+    <div class="header-logo">
+      Evil Jenkins
+    </div>
+    <span class="header-sep"></span>
+    <div class="controller-badge" id="ctrl-badge">
+      <span class="dot"></span>
+      <span id="ctrl-url">{{ controller_url }}</span>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- ─── Sidebar ─── -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span>Agents</span>
+        <span id="agent-count" style="color:var(--text1);font-size:12px;margin-right:4px;"></span>
+        <button class="btn-icon" onclick="openRegisterModal()" data-tip="Register agent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+        <button class="btn-icon" onclick="refreshAgents()" data-tip="Refresh">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M1 4v6h6M23 20v-6h-6"/>
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="agents-list" id="agents-list">
+        <div class="empty-state" id="agents-empty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <p>No agents registered yet</p>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:12px;" onclick="switchTab('downloads')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Download agent.jar
+        </button>
+      </div>
+    </aside>
+
+    <!-- ─── Main ─── -->
+    <main class="main">
+
+      <!-- Tabs -->
+      <nav class="tabs">
+        <button class="tab active" data-tab="shell" onclick="switchTab('shell')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Shell
+        </button>
+        <button class="tab" data-tab="agents" onclick="switchTab('agents')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+          Agents
+        </button>
+        <button class="tab" data-tab="downloads" onclick="switchTab('downloads')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Downloads
+        </button>
+        <span class="tab-sep"></span>
+        <button class="tab" onclick="refreshAll()" style="padding:8px 10px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+          </svg>
+        </button>
+      </nav>
+
+      <!-- ── Shell Panel ── -->
+      <div class="panel active" id="panel-shell">
+        <div class="shell-toolbar">
+          <label>Target:</label>
+          <select class="select" id="shell-agent-select" style="min-width:160px;" onchange="onAgentSelectChange()">
+            <option value="">— select agent —</option>
+          </select>
+          <span id="agent-os-badge" style="display:none;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 8px;border-radius:4px;border:1px solid var(--border-bright);color:var(--text1);background:var(--bg3);margin-left:6px;" title="Detected agent OS — checked once and cached"></span>
+          <div class="mode-toggle" style="margin-left:8px;" title="Shell mode: sh -c on Linux/macOS, PowerShell on Windows. OS is detected once per agent and cached. Script mode runs raw Groovy on the agent JVM.">
+            <button class="mode-btn active" id="mode-shell-btn" onclick="setMode('shell')">OS Shell</button>
+            <button class="mode-btn" id="mode-script-btn" onclick="setMode('script')">Groovy Script</button>
+          </div>
+          <span class="spacer"></span>
+          <button class="btn btn-ghost btn-sm" onclick="clearTerminal()">Clear</button>
+        </div>
+
+        <div class="shell-output" id="shell-output">
+          <div class="shell-welcome">
+            <div class="ascii">  ┌───────────────────────────────────────┐
+  │  Evil Jenkins  ·  Remote Shell  │
+  └───────────────────────────────────────┘</div>
+            <span style="color:var(--text2)">Select an agent and start typing.</span><br>
+            <span style="color:var(--text2)">
+              <b style="color:var(--cyan)">Shell mode</b>: OS commands via <code style="font-family:inherit">sh</code> (Linux/macOS) or <code style="font-family:inherit">PowerShell</code> (Windows) · OS detected once per agent · Enter to run  ·
+              <b style="color:var(--cyan)">Script mode</b>: Groovy script · Ctrl+Enter to run  ·
+              ↑↓ history
+            </span>
+          </div>
+        </div>
+
+        <div class="shell-input-area">
+          <!-- Shell (single-line) input -->
+          <div class="shell-input-shell" id="input-shell">
+            <span class="shell-prompt-label">›</span>
+            <input type="text" class="shell-input" id="shell-input"
+              placeholder="ls -la, ps aux, cat /etc/os-release …"
+              autocomplete="off" spellcheck="false">
+            <button class="shell-run-btn" id="shell-run-btn" onclick="runShellCmd()">Run</button>
+          </div>
+          <!-- Script (multi-line) input -->
+          <div class="shell-input-script" id="input-script" style="display:none;">
+            <textarea class="script-textarea" id="script-input"
+              placeholder="// Groovy script — runs on the remote agent JVM&#10;def msg = &quot;Hello from &quot; + InetAddress.localHost.hostName&#10;println msg&#10;return System.getProperty('os.name')"
+              spellcheck="false"></textarea>
+            <div class="script-footer">
+              <span class="script-hint">Ctrl+Enter to run</span>
+              <button class="btn btn-primary btn-sm" id="script-run-btn" onclick="runScriptCmd()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Run Script
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Agents Panel ── -->
+      <div class="panel" id="panel-agents">
+        <div class="agents-panel-inner">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Agents</div>
+              <div class="panel-subtitle">Manage registered agents and their connections</div>
+            </div>
+            <span style="flex:1"></span>
+            <button class="btn btn-primary" onclick="openRegisterModal()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Register Agent
+            </button>
+          </div>
+          <div class="agents-grid" id="agents-grid">
+            <div class="empty-state" style="grid-column:1/-1">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              <p>No agents registered. Click "Register Agent" to add one.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Downloads Panel ── -->
+      <div class="panel" id="panel-downloads">
+        <div class="downloads-panel-inner">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Downloads &amp; Launch</div>
+              <div class="panel-subtitle">Get agent.jar and connection scripts for your platform</div>
+            </div>
+          </div>
+
+          <div class="download-card">
+            <h3>agent.jar</h3>
+            <p>The Jenkins Remoting agent JAR. Run it on any machine with Java 17+ (Linux, macOS, or Windows) to connect it to this controller.</p>
+            <a class="btn btn-primary" href="/jnlpJars/agent.jar" download="agent.jar">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              Download agent.jar
+            </a>
+          </div>
+
+          <div class="download-card" id="agent-launch-section">
+            <h3>Agent Launch Commands</h3>
+            <p>Select a registered agent below to get its ready-to-run launch command and connect script.</p>
+            <select class="select" id="dl-agent-select" onchange="updateLaunchInfo()" style="margin-bottom:14px;min-width:200px;">
+              <option value="">— select agent —</option>
+            </select>
+            <div id="launch-info" style="display:none;">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;">Linux / macOS</div>
+              <div class="code-block" id="launch-cmd-block">
+                <button class="copy-btn" onclick="copyText('launch-cmd-text')">Copy</button>
+                <span id="launch-cmd-text"></span>
+              </div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;margin-top:12px;">Windows (cmd)</div>
+              <div class="code-block" id="launch-cmd-win-block">
+                <button class="copy-btn" onclick="copyText('launch-cmd-win-text')">Copy</button>
+                <span id="launch-cmd-win-text"></span>
+              </div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;margin-top:12px;">Direct TCP (no HTTP discovery)</div>
+              <div class="code-block" id="launch-direct-block">
+                <button class="copy-btn" onclick="copyText('launch-direct-text')">Copy</button>
+                <span id="launch-direct-text"></span>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                <a class="btn btn-ghost btn-sm" id="dl-launch-script" href="#" download>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  bash script
+                </a>
+                <a class="btn btn-ghost btn-sm" id="dl-docker-compose" href="#" download>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  docker-compose.yml
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ─── Register Modal ─── -->
+<div class="modal-overlay" id="register-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Register Agent</div>
+      <button class="btn-icon" onclick="closeRegisterModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="register-form-area">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Name *</label>
+          <input class="form-input" id="reg-name" placeholder="agent-01" autocomplete="off">
+          <span class="form-hint">Unique identifier for this agent</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Labels</label>
+          <input class="form-input" id="reg-labels" placeholder="linux, docker, build" autocomplete="off">
+          <span class="form-hint">Comma-separated tags (e.g. <code style="font-family:inherit;color:var(--cyan)">linux, docker, build</code>). Labels let you broadcast a script to a group of agents at once — when you run a command you can target all agents sharing a label instead of picking one by name.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input class="form-input" id="reg-desc" placeholder="Optional description" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeRegisterModal()">Cancel</button>
+        <button class="btn btn-primary" id="reg-submit" onclick="registerAgent()">Register</button>
+      </div>
+    </div>
+    <div id="register-result-area" style="display:none;">
+      <div class="secret-box">
+        <div class="secret-label">✓ Agent registered — save this secret</div>
+        <div class="secret-value" id="result-secret"></div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Launch command:</div>
+        <div class="launch-cmd-box" id="result-launch-cmd"></div>
+        <button class="btn btn-ghost btn-sm" onclick="copyText('result-launch-cmd', true)">Copy launch command</button>
+      </div>
+      <div class="modal-footer" style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="closeRegisterModal()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+//  State
+// ──────────────────────────────────────────────
+const S = {
+  agents: [],
+  cmdHistory: JSON.parse(localStorage.getItem('cmdHistory') || '[]'),
+  agentOs: JSON.parse(localStorage.getItem('agentOs') || '{}'), // agentName -> 'windows'|'unix', persisted
+  historyIdx: -1,
+  mode: 'shell',       // 'shell' | 'script'
+  executing: false,
+  controllerUrl: '{{ controller_url }}',
+};
+
+// ──────────────────────────────────────────────
+//  Init
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  checkController();
+  refreshAgents();
+  setInterval(refreshAgents, 8000);
+  setInterval(checkController, 12000);
+
+  const inp = document.getElementById('shell-input');
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runShellCmd(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); historyNav(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); historyNav(-1); }
+  });
+
+  const ta = document.getElementById('script-input');
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runScriptCmd(); }
+  });
+});
+
+// ──────────────────────────────────────────────
+//  Controller health
+// ──────────────────────────────────────────────
+async function checkController() {
+  const badge = document.getElementById('ctrl-badge');
+  try {
+    const r = await fetch('/health');
+    const data = await r.json();
+    badge.className = 'controller-badge ' + (data.status === 'ok' ? 'ok' : 'err');
+  } catch {
+    badge.className = 'controller-badge err';
+  }
+}
+
+// ──────────────────────────────────────────────
+//  Agents
+// ──────────────────────────────────────────────
+async function refreshAgents() {
+  try {
+    const r = await fetch('/api/agents');
+    if (!r.ok) return;
+    S.agents = await r.json();
+    renderSidebarAgents();
+    renderAgentsGrid();
+    updateAgentSelects();
+  } catch (e) { /* ignore */ }
+}
+
+function renderSidebarAgents() {
+  const list = document.getElementById('agents-list');
+  const empty = document.getElementById('agents-empty');
+  const count = document.getElementById('agent-count');
+  count.textContent = S.agents.length ? `(${S.agents.length})` : '';
+
+  // remove old items but keep the empty state element
+  [...list.children].forEach(c => { if (c !== empty) c.remove(); });
+
+  if (!S.agents.length) { empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+
+  S.agents.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'agent-item';
+    el.dataset.name = a.name;
+    el.innerHTML = `
+      <span class="status-dot ${a.connected ? 'connected' : 'disconnected'}"></span>
+      <div class="agent-info">
+        <div class="agent-name">${esc(a.name)}</div>
+        <div class="agent-meta" title="${a.labels && a.labels.length ? 'Labels: ' + a.labels.join(', ') + ' — use these to target this agent by group' : 'No labels — assign labels to target this agent as part of a group'}">${a.labels && a.labels.length ? a.labels.join(', ') : 'no labels'}</div>
+      </div>
+      <div class="agent-actions">
+        <button class="btn-icon" data-tip="Open shell" onclick="openShellFor('${esc(a.name)}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+        </button>
+        <button class="btn-icon" data-tip="Delete" onclick="deleteAgent('${esc(a.name)}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4h8v2"/>
+          </svg>
+        </button>
+      </div>`;
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.agent-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    });
+    list.appendChild(el);
+  });
+}
+
+function renderAgentsGrid() {
+  const grid = document.getElementById('agents-grid');
+  grid.innerHTML = '';
+  if (!S.agents.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg><p>No agents registered.</p></div>`;
+    return;
+  }
+  S.agents.forEach(a => {
+    const labels = (a.labels || []).map(l => `<span class="label-chip">${esc(l)}</span>`).join('');
+    const since = a.connectedAt ? `<br>Connected since <span>${fmtTime(a.connectedAt)}</span>` : '';
+    const addr = a.remoteAddress ? `<br>Address <span>${esc(a.remoteAddress)}</span>` : '';
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    card.innerHTML = `
+      <div class="agent-card-header">
+        <div class="agent-card-name">${esc(a.name)}</div>
+        <span class="status-badge ${a.connected ? 'connected' : 'disconnected'}">${a.connected ? 'connected' : 'offline'}</span>
+      </div>
+      ${labels
+        ? `<div class="agent-card-labels" title="Labels let you run a command across multiple agents at once — select 'by label' in the Shell target dropdown">${labels}</div>`
+        : `<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">No labels — add labels when registering to broadcast commands to a group of agents</div>`
+      }
+      <div class="agent-card-meta">
+        Executors <span>${a.executors || 1}</span>${since}${addr}
+      </div>
+      <div class="agent-card-actions">
+        <button class="btn btn-success btn-sm" onclick="openShellFor('${esc(a.name)}')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Shell
+        </button>
+        ${a.connected ? `<button class="btn btn-ghost btn-sm" onclick="disconnectAgent('${esc(a.name)}')">Disconnect</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="copyLaunchCmd('${esc(a.name)}')">Copy launch cmd</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAgent('${esc(a.name)}')">Delete</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function updateAgentSelects() {
+  ['shell-agent-select', 'dl-agent-select'].forEach(id => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— select agent —</option>';
+    S.agents.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.name;
+      opt.textContent = `${a.name}${a.connected ? ' ●' : ' ○'}`;
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  });
+}
+
+async function deleteAgent(name) {
+  if (!confirm(`Delete agent "${name}"? This cannot be undone.`)) return;
+  await fetch(`/api/agents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  refreshAgents();
+}
+
+async function disconnectAgent(name) {
+  await fetch(`/api/agents/${encodeURIComponent(name)}/disconnect`, { method: 'POST' });
+  refreshAgents();
+}
+
+async function copyLaunchCmd(name) {
+  const a = S.agents.find(x => x.name === name);
+  if (!a) return;
+  const cmd = `java -jar agent.jar -url ${S.controllerUrl} -name ${a.name} -secret <secret> -workDir /opt/agent`;
+  // fetch the actual secret
+  try {
+    const r = await fetch(`/api/agents/${encodeURIComponent(name)}`);
+    const data = await r.json();
+    const fullCmd = `java -jar agent.jar -url ${S.controllerUrl} -name ${data.name} -secret ${data.secret} -workDir /opt/agent`;
+    await navigator.clipboard.writeText(fullCmd);
+    alert('Launch command copied!');
+  } catch { alert('Could not copy'); }
+}
+
+// ──────────────────────────────────────────────
+//  Register modal
+// ──────────────────────────────────────────────
+function openRegisterModal() {
+  document.getElementById('register-modal').classList.add('open');
+  document.getElementById('register-form-area').style.display = '';
+  document.getElementById('register-result-area').style.display = 'none';
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-labels').value = '';
+  document.getElementById('reg-desc').value = '';
+  setTimeout(() => document.getElementById('reg-name').focus(), 80);
+}
+function closeRegisterModal() {
+  document.getElementById('register-modal').classList.remove('open');
+  refreshAgents();
+}
+document.getElementById('register-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeRegisterModal();
+});
+
+async function registerAgent() {
+  const name = document.getElementById('reg-name').value.trim();
+  if (!name) { document.getElementById('reg-name').focus(); return; }
+  const labelsRaw = document.getElementById('reg-labels').value;
+  const labels = labelsRaw.split(',').map(l => l.trim()).filter(Boolean);
+  const desc = document.getElementById('reg-desc').value.trim();
+
+  const btn = document.getElementById('reg-submit');
+  btn.disabled = true; btn.textContent = 'Registering…';
+
+  try {
+    const r = await fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, labels, description: desc }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Registration failed'); return; }
+
+    document.getElementById('result-secret').textContent = data.secret;
+    document.getElementById('result-launch-cmd').textContent = data.launchCommand;
+    document.getElementById('register-form-area').style.display = 'none';
+    document.getElementById('register-result-area').style.display = '';
+    refreshAgents();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Register';
+  }
+}
+
+// ──────────────────────────────────────────────
+//  Terminal / Shell
+// ──────────────────────────────────────────────
+function setMode(mode) {
+  S.mode = mode;
+  document.getElementById('mode-shell-btn').className = 'mode-btn' + (mode === 'shell' ? ' active' : '');
+  document.getElementById('mode-script-btn').className = 'mode-btn' + (mode === 'script' ? ' active' : '');
+  document.getElementById('input-shell').style.display = mode === 'shell' ? 'flex' : 'none';
+  document.getElementById('input-script').style.display = mode === 'script' ? 'flex' : 'none';
+  if (mode === 'shell') document.getElementById('shell-input').focus();
+  else document.getElementById('script-input').focus();
+}
+
+function getSelectedAgent() {
+  return document.getElementById('shell-agent-select').value;
+}
+
+function openShellFor(name) {
+  switchTab('shell');
+  document.getElementById('shell-agent-select').value = name;
+  setTimeout(() => {
+    if (S.mode === 'shell') document.getElementById('shell-input').focus();
+    else document.getElementById('script-input').focus();
+  }, 50);
+}
+
+function historyNav(dir) {
+  if (!S.cmdHistory.length) return;
+  S.historyIdx = Math.max(-1, Math.min(S.cmdHistory.length - 1, S.historyIdx + dir));
+  const inp = document.getElementById('shell-input');
+  inp.value = S.historyIdx >= 0 ? S.cmdHistory[S.cmdHistory.length - 1 - S.historyIdx] : '';
+}
+
+function pushHistory(cmd) {
+  if (cmd && (S.cmdHistory.length === 0 || S.cmdHistory[S.cmdHistory.length - 1] !== cmd)) {
+    S.cmdHistory.push(cmd);
+    if (S.cmdHistory.length > 200) S.cmdHistory.shift();
+    localStorage.setItem('cmdHistory', JSON.stringify(S.cmdHistory));
+  }
+  S.historyIdx = -1;
+}
+
+function clearTerminal() {
+  const out = document.getElementById('shell-output');
+  out.innerHTML = '';
+}
+
+async function runShellCmd() {
+  const inp = document.getElementById('shell-input');
+  const cmd = inp.value.trim();
+  if (!cmd || S.executing) return;
+  const agent = getSelectedAgent();
+  if (!agent) {
+    appendOutput(null, cmd, 'error', '⚠ No agent selected. Choose one from the toolbar above.', false);
+    return;
+  }
+  inp.value = '';
+  pushHistory(cmd);
+
+  // Detect OS once per agent, cache forever (localStorage + in-memory)
+  const os = await ensureAgentOs(agent);
+  const groovy = buildShellGroovy(cmd, os);
+  executeScript(cmd, groovy, false);
+}
+
+// Returns cached OS string for the agent, or detects it via a quick Groovy call first.
+async function ensureAgentOs(agent) {
+  if (S.agentOs[agent]) return S.agentOs[agent];
+
+  // Show a detecting indicator
+  setOsBadge(agent, '…detecting OS');
+  try {
+    const r = await fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script: "return System.getProperty('os.name')", target: agent, async: false, timeoutSeconds: 10 }),
+    });
+    const data = await r.json();
+    const osName = (data.results && data.results[0]?.output || '').toLowerCase().trim();
+    const os = osName.includes('windows') ? 'windows' : 'unix';
+    S.agentOs[agent] = os;
+    localStorage.setItem('agentOs', JSON.stringify(S.agentOs));
+    setOsBadge(agent, os);
+    return os;
+  } catch {
+    // If detection fails, fall back to unix behaviour
+    return 'unix';
+  }
+}
+
+function buildShellGroovy(cmd, os) {
+  const q = JSON.stringify(cmd);
+  if (os === 'windows') {
+    return `def proc = ['powershell', '-NonInteractive', '-Command', ${q}].execute()\nproc.waitFor()\ndef o = proc.in.text; def e = proc.err.text\nreturn (o + (e ? (o ? '\\n' : '') + '[stderr] ' + e : '')).stripTrailing()`;
+  }
+  return `def proc = ['sh', '-c', ${q}].execute()\nproc.waitFor()\ndef o = proc.in.text; def e = proc.err.text\nreturn (o + (e ? (o ? '\\n' : '') + '[stderr] ' + e : '')).stripTrailing()`;
+}
+
+function setOsBadge(agent, os) {
+  const badge = document.getElementById('agent-os-badge');
+  if (!badge) return;
+  const cur = getSelectedAgent();
+  if (cur !== agent) return; // agent changed since we started detecting
+  if (!os || os === '…detecting OS') {
+    badge.textContent = os || '';
+    badge.style.display = os ? '' : 'none';
+    return;
+  }
+  badge.style.display = '';
+  badge.textContent = os === 'windows' ? 'powershell' : 'sh';
+  badge.style.color = os === 'windows' ? 'var(--cyan)' : 'var(--green)';
+  badge.style.borderColor = os === 'windows' ? 'var(--cyan-dim)' : 'var(--green-dim)';
+}
+
+function onAgentSelectChange() {
+  const agent = getSelectedAgent();
+  if (!agent) {
+    const badge = document.getElementById('agent-os-badge');
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  // Show cached value immediately if we have it; otherwise hide until next command detects
+  if (S.agentOs[agent]) {
+    setOsBadge(agent, S.agentOs[agent]);
+  } else {
+    const badge = document.getElementById('agent-os-badge');
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function runScriptCmd() {
+  const ta = document.getElementById('script-input');
+  const script = ta.value.trim();
+  if (!script || S.executing) return;
+  executeScript(script, script, true);
+}
+
+async function executeScript(displayCmd, groovyScript, multiline) {
+  const agent = getSelectedAgent();
+  if (!agent) {
+    appendOutput(null, displayCmd, 'error', '⚠ No agent selected. Choose one from the toolbar above.', multiline);
+    return;
+  }
+
+  S.executing = true;
+  document.getElementById('shell-run-btn').disabled = true;
+  document.getElementById('script-run-btn').disabled = true;
+
+  const blockId = appendOutput(agent, displayCmd, 'running', null, multiline);
+  const start = Date.now();
+
+  try {
+    const r = await fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script: groovyScript, target: agent, async: false, timeoutSeconds: 60 }),
+    });
+    const data = await r.json();
+    const elapsed = Date.now() - start;
+    const result = data.results && data.results[0];
+
+    if (result) {
+      const status = result.status === 'SUCCESS' ? 'ok' : 'error';
+      const text = result.output || result.error || '(no output)';
+      updateBlock(blockId, status, text, elapsed, result.durationMs);
+    } else {
+      updateBlock(blockId, 'error', data.error || JSON.stringify(data), elapsed, 0);
+    }
+  } catch (e) {
+    updateBlock(blockId, 'error', `Network error: ${e.message}`, Date.now() - start, 0);
+  } finally {
+    S.executing = false;
+    document.getElementById('shell-run-btn').disabled = false;
+    document.getElementById('script-run-btn').disabled = false;
+    if (S.mode === 'shell') document.getElementById('shell-input').focus();
+  }
+}
+
+let blockSeq = 0;
+function appendOutput(agent, script, status, text, multiline) {
+  const id = `block-${++blockSeq}`;
+  const out = document.getElementById('shell-output');
+  const now = new Date().toLocaleTimeString();
+
+  const cmdClass = multiline ? 'exec-cmd multiline' : 'exec-cmd';
+  const agentTag = agent ? `<span class="exec-agent-tag">${esc(agent)}</span>` : '';
+  const cmdHtml = multiline
+    ? `<div class="${cmdClass}"><span class="cmd-text">${esc(script)}</span></div>`
+    : `<div class="${cmdClass}"><span class="prompt">›</span><span class="cmd-text">${esc(script)}</span></div>`;
+
+  let outputHtml = '';
+  if (status === 'running') {
+    outputHtml = `<div class="exec-output running"><span class="spinner"></span>Running…</div>`;
+  } else if (text !== null) {
+    outputHtml = `<div class="exec-output ${status === 'error' ? 'error' : ''}">${esc(text)}</div>`;
+  }
+
+  const block = document.createElement('div');
+  block.id = id;
+  block.className = 'exec-block';
+  block.innerHTML = `
+    <div class="exec-header">
+      ${agentTag}
+      <span class="exec-time">${now}</span>
+      <span class="exec-duration" id="${id}-dur"></span>
+    </div>
+    ${cmdHtml}
+    <div id="${id}-out">${outputHtml}</div>`;
+  out.appendChild(block);
+  out.scrollTop = out.scrollHeight;
+  return id;
+}
+
+function updateBlock(id, status, text, clientMs, serverMs) {
+  const outEl = document.getElementById(`${id}-out`);
+  const durEl = document.getElementById(`${id}-dur`);
+  if (outEl) {
+    outEl.innerHTML = `<div class="exec-output ${status === 'error' ? 'error' : ''}">${esc(text)}</div>`;
+  }
+  if (durEl) {
+    durEl.textContent = `${serverMs || clientMs}ms`;
+  }
+  const out = document.getElementById('shell-output');
+  out.scrollTop = out.scrollHeight;
+}
+
+// ──────────────────────────────────────────────
+//  Downloads
+// ──────────────────────────────────────────────
+async function updateLaunchInfo() {
+  const name = document.getElementById('dl-agent-select').value;
+  const section = document.getElementById('launch-info');
+  if (!name) { section.style.display = 'none'; return; }
+
+  try {
+    const r = await fetch(`/api/agents/${encodeURIComponent(name)}`);
+    const a = await r.json();
+    const baseUrl = S.controllerUrl;
+    const host = new URL(baseUrl).hostname;
+    const cmd     = `java -jar agent.jar -url ${baseUrl} -name ${a.name} -secret ${a.secret} -workDir /opt/agent`;
+    const cmdWin  = `java -jar agent.jar -url ${baseUrl} -name ${a.name} -secret ${a.secret} -workDir C:\\agent`;
+    const direct  = `java -jar agent.jar -direct ${host}:50000 -protocols JNLP4-connect -name ${a.name} -secret ${a.secret} -workDir /opt/agent`;
+
+    document.getElementById('launch-cmd-text').textContent = cmd;
+    document.getElementById('launch-cmd-win-text').textContent = cmdWin;
+    document.getElementById('launch-direct-text').textContent = direct;
+    document.getElementById('dl-launch-script').href = `/api/agents/${encodeURIComponent(name)}/launch-script`;
+    document.getElementById('dl-docker-compose').href = `/api/agents/${encodeURIComponent(name)}/docker-compose.yml`;
+    section.style.display = '';
+  } catch { section.style.display = 'none'; }
+}
+
+// ──────────────────────────────────────────────
+//  Tab switching
+// ──────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
+  if (name === 'history') loadHistory();
+  if (name === 'shell') setTimeout(() => {
+    if (S.mode === 'shell') document.getElementById('shell-input').focus();
+  }, 50);
+}
+
+function refreshAll() {
+  checkController();
+  refreshAgents();
+  loadHistory();
+}
+
+// ──────────────────────────────────────────────
+//  Utilities
+// ──────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleTimeString(); } catch { return iso; }
+}
+
+async function copyText(id, isText) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = isText ? el.textContent : el.textContent;
+  try {
+    await navigator.clipboard.writeText(text.trim());
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text.trim();
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+}
+</script>
+</body>
+</html>

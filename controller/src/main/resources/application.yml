@@ -1,0 +1,18 @@
+server:
+  # Bind to all interfaces so agents can reach /tcpSlaveAgentListener/ for HTTP discovery.
+  # All /api/* routes are protected by the token in the api section below.
+  httpHost: "0.0.0.0"
+  httpPort: 8080
+  tcpPort: 50000
+  baseUrl: "http://localhost:8080"
+
+identity:
+  keystorePath: "data/controller.jks"
+  keystorePassword: "jenkins-agent-engine"
+
+data:
+  agentsFile: "data/agents.json"
+  agentJarCache: "data/agent-jar-cache"
+
+api:
+  token: "changeme-api-token"

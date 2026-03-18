@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  controller:
+    build:
+      context: ./controller
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - controller-data:/app/data
+    environment:
+      - JAVA_OPTS=-Xmx512m
+
+  agent-01:
+    image: jenkins/inbound-agent:latest
+    environment:
+      JENKINS_URL: http://controller:8080
+      JENKINS_AGENT_NAME: agent-01
+      JENKINS_SECRET: "${AGENT_01_SECRET}"
+      JENKINS_AGENT_WORKDIR: /home/jenkins/agent
+    depends_on:
+      - controller
+    restart: on-failure
+
+  agent-02:
+    image: jenkins/inbound-agent:latest
+    environment:
+      JENKINS_URL: http://controller:8080
+      JENKINS_AGENT_NAME: agent-02
+      JENKINS_SECRET: "${AGENT_02_SECRET}"
+      JENKINS_AGENT_WORKDIR: /home/jenkins/agent
+    depends_on:
+      - controller
+    restart: on-failure
+
+volumes:
+  controller-data:
