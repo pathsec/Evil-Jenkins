@@ -4,6 +4,8 @@ A command-and-control (C2) POC framework that uses the Jenkins Remoting protocol
 
 Unmodified `jenkins/inbound-agent` Docker containers and native `agent.jar` instances on Linux, macOS, and Windows connect over **JNLP4-connect**, the same TLS-wrapped protocol used by production Jenkins infrastructure worldwide.
 
+<img width="1248" height="365" alt="Screenshot_20260317_230839" src="https://github.com/user-attachments/assets/74e4c712-602f-4688-92b5-8784862c13e3" />
+
 ---
 
 ## Why Jenkins as a C2 Channel?
