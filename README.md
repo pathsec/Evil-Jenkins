@@ -8,7 +8,7 @@ Unmodified `jenkins/inbound-agent` Docker containers and native `agent.jar` inst
 
 ## Why Jenkins as a C2 Channel?
 
-- **Blends into enterprise traffic.** Jenkins is ubiquitous in CI/CD environments. Connections from build agents to a controller on TCP 50000 rarely raise alerts.
+- **Blends into enterprise traffic.** Jenkins is common across enterprise environments. Connections from build agents to a controller on TCP 50000 likely would not raise an alert, or may be ignored.
 - **TLS-encrypted by default.** JNLP4-connect negotiates a TLS session using the controller's self-signed certificate — all tasking and results travel encrypted without requiring additional infrastructure.
 - **Uses a signed, trusted implant binary.** The implant is the official `agent.jar` published by the Jenkins project. It is not patched, repackaged, or otherwise modified, so it will not trigger static analysis or signature-based detection.
 - **Cross-platform.** The same agent JAR runs on any OS with a JVM. Shell dispatch adapts automatically to Linux/macOS (`sh -c`) or Windows (`powershell`).
