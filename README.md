@@ -1,7 +1,7 @@
 <p align="center">
   <img
-    width="512"
-    height="512"
+    width="256"
+    height="256"
     alt="evil-jenkins-logo-simple"
     src="https://github.com/user-attachments/assets/8ce5a6f3-0d03-41b9-b78d-a4b74d12f64d"
   />
